@@ -1,0 +1,2 @@
+D:\Code\CG\DirectX-Graphics-Samples-master\D3DBook\Chapter 20 Shadow Mapping\Shadows\x64\Debug\Shadows.exe
+D:\Code\Engine\ShadowRenderer\Code\Shadows\x64\Debug\Shadows.exe
