@@ -44,11 +44,13 @@ struct PassConstants
 struct MaterialData
 {
 	DirectX::XMFLOAT4 DiffuseAlbedo = { 1.0f, 1.0f, 1.0f, 1.0f };
-	DirectX::XMFLOAT3 FresnelR0 = { 0.01f, 0.01f, 0.01f };
-	float Roughness = 0.5f;
 
 	// Used in texture mapping.
 	DirectX::XMFLOAT4X4 MatTransform = MathHelper::Identity4x4();
+    float Metalness = 0.5;
+    float Roughness = 0.5;
+    float MaterialPad3;
+    float MaterialPad4;
 
 	UINT DiffuseMapIndex = 0;
 	UINT NormalMapIndex = 0;

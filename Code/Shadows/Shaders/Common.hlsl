@@ -42,17 +42,20 @@ static float2 poissonDisk[16] =
 struct MaterialData
 {
 	float4   DiffuseAlbedo;
-	float3   FresnelR0;
-	float    Roughness;
 	float4x4 MatTransform;
+    float Metalness;
+    float Roughness;
+    float MatPad3;
+    float MatPad4;
 	uint     DiffuseMapIndex;
 	uint     NormalMapIndex;
 	uint     MatPad1;
 	uint     MatPad2;
 };
 
-TextureCube gCubeMap : register(t0);
-Texture2D gShadowMap : register(t1);
+TextureCube gCubeMap : register(t0, space2);
+Texture2D gShadowMap : register(t1, space2);
+TextureCube irradiancecubeMap : register(t2, space2);
 
 // An array of textures, which is only supported in shader model 5.1+.  Unlike Texture2DArray, the textures
 // in this array can be different sizes and formats, making it more flexible than texture arrays.

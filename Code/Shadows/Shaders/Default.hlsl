@@ -70,8 +70,8 @@ float4 PS(VertexOut pin) : SV_Target
 	// Fetch the material data.
 	MaterialData matData = gMaterialData[gMaterialIndex];
 	float4 diffuseAlbedo = matData.DiffuseAlbedo;
-	float3 fresnelR0 = matData.FresnelR0;
 	float  roughness = matData.Roughness;
+    float metalness = matData.Metalness;
 	uint diffuseMapIndex = matData.DiffuseMapIndex;
 	uint normalMapIndex = matData.NormalMapIndex;
 	
@@ -97,24 +97,26 @@ float4 PS(VertexOut pin) : SV_Target
     float3 toEyeW = normalize(gEyePosW - pin.PosW);
 
     // Light terms.
-    float4 ambient = gAmbientLight*diffuseAlbedo;
-
+    float4 ambient = gAmbientLight * diffuseAlbedo;
+    
     // Only the first light casts a shadow.
     float3 shadowFactor = float3(1.0f, 1.0f, 1.0f);
     shadowFactor[0] = PCSS(pin.ShadowPosH);
 
     const float shininess = (1.0f - roughness) * normalMapSample.a;
-    Material mat = { diffuseAlbedo, fresnelR0, shininess };
+    float3 F0 = float3(0.04, 0.04, 0.04);
+    F0 = lerp(F0, diffuseAlbedo.rgb, metalness);
+    Material mat = { diffuseAlbedo, F0, metalness, roughness };
     float4 directLight = ComputeLighting(gLights, mat, pin.PosW,
         bumpedNormalW, toEyeW, shadowFactor);
-
+    
     float4 litColor = ambient + directLight;
 
-	// Add in specular reflections.
-    float3 r = reflect(-toEyeW, bumpedNormalW);
-    float4 reflectionColor = gCubeMap.Sample(gsamLinearWrap, r);
-    float3 fresnelFactor = SchlickFresnel(fresnelR0, bumpedNormalW, r);
-    litColor.rgb += shininess * fresnelFactor * reflectionColor.rgb;
+	//// Add in specular reflections.
+ //   float3 r = reflect(-toEyeW, bumpedNormalW);
+ //   float4 reflectionColor = gCubeMap.Sample(gsamLinearWrap, r);
+ //   float3 fresnelFactor = SchlickFresnel(F0, bumpedNormalW, r);
+ //   litColor.rgb += shininess * fresnelFactor * reflectionColor.rgb;
 	
     // Common convention to take alpha from diffuse albedo.
     litColor.a = diffuseAlbedo.a;

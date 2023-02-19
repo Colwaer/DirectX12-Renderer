@@ -6,6 +6,9 @@
 
 #define MaxLights 16
 
+// Numeric constants
+static const float PI = 3.14159265;
+
 struct Light
 {
     float3 Strength;
@@ -20,7 +23,8 @@ struct Material
 {
     float4 DiffuseAlbedo;
     float3 FresnelR0;
-    float Shininess;
+    float Metalness;
+    float Roughness;
 };
 
 float CalcAttenuation(float d, float falloffStart, float falloffEnd)
@@ -31,19 +35,73 @@ float CalcAttenuation(float d, float falloffStart, float falloffEnd)
 
 // Schlick gives an approximation to Fresnel reflectance (see pg. 233 "Real-Time Rendering 3rd Ed.").
 // R0 = ( (n-1)/(n+1) )^2, where n is the index of refraction.
-float3 SchlickFresnel(float3 R0, float3 normal, float3 lightVec)
+float3 SchlickFresnel(float3 R0, float3 h, float3 v)
 {
-    float cosIncidentAngle = saturate(dot(normal, lightVec));
+    float cosIncidentAngle = saturate(dot(h, v));
 
     float f0 = 1.0f - cosIncidentAngle;
     float3 reflectPercent = R0 + (1.0f - R0)*(f0*f0*f0*f0*f0);
 
     return reflectPercent;
 }
+// GGX specular D (normal distribution)
+float Specular_D_GGX(float NdotH, float roughness)
+{
+    float alpha = roughness * roughness;
+    float alphaSqr = max(alpha * alpha, 0.0001);
+    float lower = NdotH * NdotH * (alphaSqr - 1) + 1;
+    return alphaSqr / max(1e-6, PI * lower * lower);
+}
+// K_direct is  (roughness + 1)^2 / 8    K_IBL is (roughness)^2 / 2
+float G_Schlick_GGX(float3 n, float3 v, float k)
+{
+    float NdotV = max(dot(n, v), 0.f);
+    //float NdotV = dot(n, v);
+    return NdotV / (NdotV * (1 - k) + k);
+}
+// 光线入射和出射到眼睛各有一次遮蔽
+float G_InAndOutSum(float3 n, float3 v, float3 l, float k)
+{
+    return G_Schlick_GGX(n, v, k) * G_Schlick_GGX(n, l, k);
+}
+float3 LambertDiffuse(float3 kS, float3 albedo, float metalness)
+{
+    float3 kD = (float3(1.0f, 1.0f, 1.0f) - kS) * (1 - metalness);
+    return (kD * albedo);
+}
+// Cook-Torrance Specular
+float3 CookTorrance(float3 n, float3 l, float3 v, float roughness, float metalness, float3 f0, out float3 kS)
+{
+    float3 h = normalize(v + l);
+
+    float D = Specular_D_GGX(max(dot(n, h), 0.f), roughness);
+    float3 F = SchlickFresnel(f0, v, h);
+    float G = G_InAndOutSum(n, v, l, (roughness + 1) * (roughness + 1) / 8.f);
+    kS = F;
+    float NdotV = max(dot(n, v), 0.0f);
+    float NdotL = max(dot(n, l), 0.0f);
+    return (D * F * G) / (4 * max(NdotV * NdotL, 0.01f));
+}
+
+float3 DirectPBR(float3 lightStrength, float3 lightVec, float3 normal, float3 toEye, Material mat)
+{
+    float3 kS = float3(0, 0, 0);
+    float3 albedo = mat.DiffuseAlbedo.rgb;
+    
+    // cookTorrance算出了kS
+    float3 specBRDF = CookTorrance(normal, lightVec, toEye, mat.Roughness, mat.Metalness, mat.FresnelR0, kS);
+    float3 diffBRDF = LambertDiffuse(kS, albedo, mat.Metalness);
+
+    // 这个已经乘过了
+    // float NdotL = max(dot(normal, lightStrength), 0.f);
+    
+    return (diffBRDF + specBRDF) * lightStrength;
+}
+
 
 float3 BlinnPhong(float3 lightStrength, float3 lightVec, float3 normal, float3 toEye, Material mat)
 {
-    const float m = mat.Shininess * 256.0f;
+    const float m = mat.Roughness * 256.0f;
     float3 halfVec = normalize(toEye + lightVec);
 
     float roughnessFactor = (m + 8.0f)*pow(max(dot(halfVec, normal), 0.0f), m) / 8.0f;
@@ -70,7 +128,7 @@ float3 ComputeDirectionalLight(Light L, Material mat, float3 normal, float3 toEy
     float ndotl = max(dot(lightVec, normal), 0.0f);
     float3 lightStrength = L.Strength * ndotl;
 
-    return BlinnPhong(lightStrength, lightVec, normal, toEye, mat);
+    return DirectPBR(lightStrength, lightVec, normal, toEye, mat);
 }
 
 //---------------------------------------------------------------------------------------
